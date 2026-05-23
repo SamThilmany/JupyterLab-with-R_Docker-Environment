@@ -1,0 +1,6 @@
+# The Docker build only needs jupyter-r/.
+# Excluding everything else prevents gigabytes of notebook data and
+# git history from being transferred to the Docker daemon on every rebuild.
+*
+!jupyter-r/
+!jupyter-r/**

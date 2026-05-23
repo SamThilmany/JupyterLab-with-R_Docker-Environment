@@ -2,15 +2,16 @@
 
 <div align="center">
     <h1>JupyterLab R Environment</h1>
-    <h4>A Docker Environment for Statistical Analysis using R in JupyterNotebooks</h4>
+    <h4>A Reproducible Docker Environment for Statistical Analysis in R</h4>
     <p>
-        <img src="https://img.shields.io/badge/Version:-2.0.0-green" alt="Version 2.0.1" />
+        <img src="https://img.shields.io/badge/Version:-2.1.0-green" alt="Version 2.1.0" />
     </p>
 </div>
 
-This project provides a pre-configured Docker image to effortlessly run JupyterLab with R as the default language. The image includes essential dependencies, R installation, and popular packages like `tidyverse`, `ggplot2`, `dplyr`, and `BiocManager` for seamless data manipulation and analysis. Your notebooks will be stored in the 'notebooks' directory, ensuring organized work. Enjoy a hassle-free, reproducible, and isolated environment for your data science tasks!
+A Docker-based JupyterLab environment with R as the kernel, designed for reproducible data analysis. All R and Python package versions are pinned via `renv.lock` and `requirements.txt` so that the analysis environment can be reconstructed exactly on any machine.
 
 ## Table of Contents
+
 <ol>
   <li>
     <a href="#getting-started">Getting Started</a>
@@ -19,112 +20,186 @@ This project provides a pre-configured Docker image to effortlessly run JupyterL
       <li><a href="#installation">Installation</a></li>
     </ul>
   </li>
+  <li><a href="#https-support">HTTPS Support</a></li>
+  <li><a href="#package-management">Package Management</a></li>
   <li><a href="#pre-installed-r-packages">Pre-installed R Packages</a></li>
+  <li><a href="#pre-installed-bioconductor-packages">Pre-installed Bioconductor Packages</a></li>
   <li><a href="#versioning">Versioning</a></li>
   <li><a href="#license">License</a></li>
 </ol>
 
 ## Getting Started
-This guide will help you set up a running copy of **JupyterLab Environment for Statistical Analysis using R** on your machine. The Docker environment provides a seamless and isolated workspace for data science tasks, with R as the default language and popular packages pre-installed. Let's get started!
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Prerequisites
-Ensure you have the following software installed on your machine. If not, download and install them from the provided official website:
+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Git](https://git-scm.com)
+- [mkcert](https://github.com/FiloSottile/mkcert) — optional, for HTTPS support (see [HTTPS Support](#https-support))
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Installation
-#### Step 1: Clone the Repository
-Clone this Git repository to your local machine using Git:
+
+#### 1. Clone the Repository
 
 ```bash
-cd /Users/your_username/path_to_install
-
 git clone git@github.com:SamThilmany/JupyterLab-with-R--Docker-Environment.git
+cd JupyterLab-with-R--Docker-Environment
 ```
 
-#### Step 2: Build the Docker Image
-Move into the `jupyter_r` directory of the cloned project and build the container:
+#### 2. Build the Docker Image
 
 ```bash
-cd /Users/your_username/path_to_install/JupyterLab-with-R--Docker-Environment/jupyter_r
-
+cd jupyter-r
 docker compose build
 ```
 
-This step will take a few minutes (maybe a few minutes more than you'd like, depending on your connection speed), so make sure you grab a cup of coffee and pass the time by thinking about the big questions of humanity... ☕️
+The image is pinned to `linux/amd64` because rawrr's .NET assembly is only available as an x86-64 binary on Linux. On Apple Silicon (M1/M2/M3/…), Docker Desktop runs the container via Rosetta 2 — no additional configuration is required.
 
-*Unfortunately, the process sometimes fails. Occasionally even several times in succession. This is usually due to a weak Internet connection; it is therefore highly advisable to be connected to the Internet via cable. 
-If the process fails, you can simply enter the `build` command again. All packages that have already been downloaded were cached so that you do not have to start from scratch. If the process aborts several times, check whether packages have been successfully downloaded again in between. This indicates that it is actually due to network problems.*
+Building downloads all R and Python packages and may take several minutes depending on network speed. If the build fails due to a transient download error, re-running the command is safe — Docker caches completed layers and renv retries failed package downloads automatically.
 
-#### Step 3: Run the Docker Container
-Still in the `jupyter_r` directory, run:
+#### 3. Start the Container
 
 ```bash
 docker compose up -d
 ```
 
-#### Step 4: Access JupyterLab
-Open your favourite web browser and enter the following URL into the adress bar:
-- `http://127.0.0.1:8888/`
+The container restarts automatically after Docker Desktop or system restarts.
 
-#### Step 5: Start Exploring
-Congratulations! You now have a fully functional JupyterLab environment with R as the default language. Start creating new notebooks, analyzing data, and utilizing the power of R and its rich ecosystem of packages.
+#### 4. Access JupyterLab
 
-#### Additional Notes
-- To stop the JupyterLab session, type `Ctrl + C` in the terminal where the container is running. Then type `docker compose down` to stop the Docker container.
-- To start the container again in the future, repeat Step 3.
-- Your notebooks will be saved in the `/Users/your_username/path_to_install/JupyterLab-with-R--Docker-Environment/notebooks/` directory on your local machine, enabling easy access and collaboration.
+Open a browser and navigate to:
 
-Enjoy your productive data science journey with the **JupyterLab Environment for Statistical Analysis using R**! If you encounter any issues or have any questions, please feel free to reach out via GitLab Issues. Happy coding!
+- `https://localhost:8888` — if HTTPS certificates are configured (see below)
+- `http://localhost:8888` — fallback when no certificates are present
+
+#### 5. Stop the Container
+
+```bash
+docker compose down
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## HTTPS Support
+
+JupyterLab can be served over HTTPS using a locally-trusted certificate generated by [mkcert](https://github.com/FiloSottile/mkcert). This avoids browser security warnings without requiring any exceptions to be added manually.
+
+### macOS
+
+```bash
+brew install mkcert
+mkcert -install
+
+mkdir -p jupyter-r/certs
+cd jupyter-r/certs
+mkcert localhost 127.0.0.1
+mv localhost+1.pem cert.pem
+mv localhost+1-key.pem key.pem
+```
+
+### Windows
+
+```powershell
+choco install mkcert
+mkcert -install
+
+mkdir jupyter-r\certs
+cd jupyter-r\certs
+mkcert localhost 127.0.0.1
+Rename-Item localhost+1.pem cert.pem
+Rename-Item localhost+1-key.pem key.pem
+```
+
+After placing the certificate files, restart the container:
+
+```bash
+docker compose restart jupyter
+```
+
+The server falls back to HTTP automatically when no certificate files are present, so the setup remains functional on machines without mkcert configured.
+
+> **Note:** The `jupyter-r/certs/` directory is excluded from version control. Do not commit certificate files.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Package Management
+
+R packages are installed from `renv.lock`, which records the exact version of every package in the image. Python packages are pinned in `requirements.txt`. Both files are committed to the repository to ensure that any rebuild produces an identical environment.
+
+### Adding R Packages
+
+1. Add the package name to the appropriate list in `jupyter-r/install_packages.R`.
+2. Delete `jupyter-r/renv.lock` to force a fresh install.
+3. Rebuild the image:
+   ```bash
+   docker compose build
+   ```
+4. On the next `docker compose up`, the updated `renv.lock` is copied to the `notebooks/` directory. Move it to `jupyter-r/` and commit it:
+   ```bash
+   mv notebooks/renv.lock jupyter-r/renv.lock
+   git add jupyter-r/renv.lock
+   git commit -m "add <package-name>"
+   ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Pre-installed R Packages
-- IRkernel
-- languageserver
-- devtools
-- tidyverse
-- showtext
-- ggplot2
-- ggfortify
-- ggforce
-- ggtext
-- ggrepel
-- GGally
-- ggVennDiagram
-- eulerr
-- patchwork
-- cowplot
-- metR
-- doParallel
-- combinat
-- disgenet2r (via `devtools` and GitLab)
+
+| Package | Description |
+|---|---|
+| IRkernel, IRdisplay, repr | R kernel for JupyterLab |
+| languageserver | R language server for editor support |
+| devtools | Package development tools |
+| tidyverse | Collection of data science packages (dplyr, ggplot2, tidyr, …) |
+| ggplot2 | Grammar of graphics plotting |
+| ggfortify | ggplot2 extensions for statistical objects |
+| ggforce | ggplot2 extension with additional geoms |
+| ggtext | Markdown and HTML text rendering in ggplot2 |
+| ggrepel | Non-overlapping text labels for ggplot2 |
+| GGally | ggplot2 extension for matrix plots and model diagnostics |
+| ggVennDiagram | Venn diagram geoms for ggplot2 |
+| eulerr | Euler and Venn diagrams |
+| patchwork | Composing multiple ggplot2 panels |
+| cowplot | Plot arrangement and annotation |
+| metR | Meteorological and geophysical field visualisation |
+| scales | Scale functions for visualisation |
+| showtext | Custom font rendering in R graphics |
+| RColorBrewer | Colour palettes for data visualisation |
+| doParallel | Parallel computing backend |
+| combinat | Combinatorics utilities |
+| s2 | Spherical geometry |
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Pre-installed Bioconductor Packages
-- fgsea
-- biomaRt
-- enrichplot
-- DOSE
-- limma
-- clusterProfiler
-- AnnotationDbi
-- org.Hs.eg.db
-- rawrr
-- ComplexHeatmap
-- MSstats
-- MSstatsTMT
+
+| Package | Description |
+|---|---|
+| rawrr | Direct access to Thermo raw mass spectrometry data |
+| limma | Linear models for microarray and RNA-seq data |
+| fgsea | Fast gene set enrichment analysis |
+| clusterProfiler | Statistical analysis of functional gene clusters |
+| enrichplot | Visualisation of functional enrichment results |
+| DOSE | Disease ontology semantic and enrichment analysis |
+| biomaRt | Interface to BioMart databases (Ensembl, etc.) |
+| AnnotationDbi | Annotation database interface |
+| org.Hs.eg.db | Human genome-wide annotation |
+| ComplexHeatmap | Complex heatmap and annotation visualisation |
+| circlize | Circular visualisation |
+| MSstats | Statistical analysis of quantitative mass spectrometry data |
+| MSstatsTMT | MSstats extension for TMT labelling experiments |
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Versioning
-[Semantic Versioning](http://semver.org/) is used for versioning. For the versions
-available, see the [Releases](https://github.com/SamThilmany/JupyterLab-with-R--Docker-Environment/releases).
+
+[Semantic Versioning](http://semver.org/) is used for versioning. For available versions, see the [Releases](https://github.com/SamThilmany/JupyterLab-with-R--Docker-Environment/releases).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## License
+
 This project is distributed under the Apache License 2.0. See [LICENSE](/LICENSE) for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

@@ -1,91 +1,65 @@
-# The version has to be explicitely defined as the :latest tag does not define the ARM64 image
-FROM bioconductor/bioconductor_docker:RELEASE_3_21 
+# Pinned to linux/amd64 — rawrr's dotnet assembly is x64-only (no linux-arm64 binary).
+# On Apple Silicon, Docker Desktop runs this via Rosetta 2.
+FROM bioconductor/bioconductor_docker:3.21-r-4.5.2@sha256:359702d482e70e343d2a436731b7c6deffd1ec184a1f1700de5d64b0c97cacba
 
-## Install system dependencies
-RUN apt-get update --fix-missing
-
-RUN apt-get install -y --no-install-recommends \
+# System packages. apt-get upgrade is omitted to keep system library versions
+# fixed to those in the base image, which matters for numerical reproducibility.
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends \
         ca-certificates \
         curl && \
-    update-ca-certificates
+    update-ca-certificates && \
+    apt-get clean && \
+    apt-get autoremove -y && \
+    apt-get autoclean -y && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y --no-install-recommends \
-        mono-mcs \
-        mono-xbuild \
-        mono-devel \
-        mono-complete \
-        nodejs \
-        npm
+# Set the Bioconductor mirror. CRAN and download settings are already
+# configured in the base image to use RSPM binary packages; do not override them.
+RUN printf '\noptions(BioC_mirror = "http://bioconductor.statistik.tu-dortmund.de/")\n' \
+    >> /usr/local/lib/R/etc/Rprofile.site
 
-RUN apt-get clean
-RUN apt-get autoremove -y
-RUN apt-get autoclean -y
-RUN rm -rf /var/lib/apt/lists/*
+# rawrr stores its dotnet assembly in the R user cache. Using a fixed path
+# ensures the binary installed by root is accessible to the jupyter user.
+ENV R_USER_CACHE_DIR=/opt/R-cache
 
-## Select CRAN Mirror
-RUN R -e "options(download.file.method = 'libcurl', url.method = 'libcurl', BioC_mirror = 'http://bioconductor.statistik.tu-dortmund.de/', repos = c(CRAN = 'https://ftp.fau.de/cran/'))"
+COPY jupyter-r/install_jupyter.sh /tmp/install_jupyter.sh
+COPY jupyter-r/requirements.txt* /tmp/
+RUN bash /tmp/install_jupyter.sh
 
-## Install JupyterLab
-RUN pip3 install jupyter --break-system-packages
+COPY jupyter-r/install_packages.R /tmp/install_packages.R
+COPY jupyter-r/install_packages.sh /tmp/install_packages.sh
+COPY jupyter-r/renv.lock* /tmp/
+RUN bash /tmp/install_packages.sh
 
-RUN R -e "if (!requireNamespace('IRkernel')) { install.packages(c('repr', 'IRdisplay', 'IRkernel')); if (!requireNamespace('IRkernel')) stop('Package "IRkernel" failed to install') }"
 RUN R -e "IRkernel::installspec(user = FALSE)"
-RUN R -e "if (!requireNamespace('languageserver')) { install.packages('languageserver'); if (!requireNamespace('languageserver')) stop('Package "languageserver" failed to install') }"
 
-# Install R packages
-RUN R -e "if (!requireNamespace('devtools')) { install.packages('devtools'); if (!requireNamespace('devtools')) stop('Package "devtools" failed to install') }"
-RUN R -e "if (!requireNamespace('tidyverse')) { install.packages('tidyverse'); if (!requireNamespace('tidyverse')) stop('Package "tidyverse" failed to install') }"
-RUN R -e "if (!requireNamespace('showtext')) { install.packages('showtext'); if (!requireNamespace('showtext')) stop('Package "showtext" failed to install') }"
-RUN R -e "if (!requireNamespace('ggplot2')) { install.packages('ggplot2'); if (!requireNamespace('ggplot2')) stop('Package "ggplot2" failed to install') }"
-RUN R -e "if (!requireNamespace('ggfortify')) { install.packages('ggfortify'); if (!requireNamespace('ggfortify')) stop('Package "ggfortify" failed to install') }"
-RUN R -e "if (!requireNamespace('ggforce')) { install.packages('ggforce'); if (!requireNamespace('ggforce')) stop('Package "ggforce" failed to install') }"
-RUN R -e "if (!requireNamespace('ggtext')) { install.packages('ggtext'); if (!requireNamespace('ggtext')) stop('Package "ggtext" failed to install') }"
-RUN R -e "if (!requireNamespace('ggrepel')) { install.packages('ggrepel'); if (!requireNamespace('ggrepel')) stop('Package "ggrepel" failed to install') }"
-RUN R -e "if (!requireNamespace('GGally')) { install.packages('GGally'); if (!requireNamespace('GGally')) stop('Package "GGally" failed to install') }"
-RUN R -e "if (!requireNamespace('ggVennDiagram')) { install.packages('ggVennDiagram'); if (!requireNamespace('ggVennDiagram')) stop('Package "ggVennDiagram" failed to install') }"
-RUN R -e "if (!requireNamespace('eulerr')) { install.packages('eulerr'); if (!requireNamespace('eulerr')) stop('Package "eulerr" failed to install') }"
-RUN R -e "if (!requireNamespace('patchwork')) { install.packages('patchwork'); if (!requireNamespace('patchwork')) stop('Package "patchwork" failed to install') }"
-RUN R -e "if (!requireNamespace('cowplot')) { install.packages('cowplot'); if (!requireNamespace('cowplot')) stop('Package "cowplot" failed to install') }"
-RUN R -e "if (!requireNamespace('metR')) { install.packages(c('s2', 'metR')); if (!requireNamespace('metR')) stop('Package "metR" failed to install') }"
-RUN R -e "if (!requireNamespace('doParallel')) { install.packages('doParallel'); if (!requireNamespace('doParallel')) stop('Package "doParallel" failed to install') }"
-RUN R -e "if (!requireNamespace('combinat')) { install.packages('combinat'); if (!requireNamespace('combinat')) stop('Package "combinat" failed to install') }"
+# Download the rawrr dotnet assembly and verify it was installed successfully.
+RUN mkdir -p /opt/R-cache && \
+    Rscript -e " \
+    rawrr::installRawrrExe(); \
+    cache_dir <- tools::R_user_dir('rawrr', 'cache'); \
+    asm <- list.files(file.path(cache_dir, 'rawrrassembly'), \
+                      recursive = TRUE, full.names = TRUE); \
+    if (length(asm) == 0) \
+      stop('rawrr assembly not installed. Check network access to fgcz-ms.uzh.ch.'); \
+    message('rawrr OK: ', paste(asm, collapse = ', ')) \
+    " && \
+    chmod -R 755 /opt/R-cache
 
-# Install GitLab packages
-RUN R -e "if (!requireNamespace('disgenet2r')) { devtools::install_gitlab('medbio/disgenet2r'); if (!requireNamespace('disgenet2r')) stop('Package "disgenet2r" failed to install') }"
+RUN useradd -m -u 1001 -s /bin/bash jupyter
 
-# Install Bioconductor packages
-RUN R -e "if (!requireNamespace('fgsea')) { BiocManager::install('fgsea', ask = FALSE); if (!requireNamespace('fgsea')) stop('Package "fgsea" failed to install') }"
-RUN R -e "if (!requireNamespace('biomaRt')) { BiocManager::install('biomaRt', ask = FALSE); if (!requireNamespace('biomaRt')) stop('Package "biomaRt" failed to install') }"
-RUN R -e "if (!requireNamespace('enrichplot')) { BiocManager::install('enrichplot', ask = FALSE); if (!requireNamespace('enrichplot')) stop('Package "enrichplot" failed to install') }"
-RUN R -e "if (!requireNamespace('DOSE')) { BiocManager::install('DOSE', ask = FALSE); if (!requireNamespace('DOSE')) stop('Package "DOSE" failed to install') }"
-RUN R -e "if (!requireNamespace('limma')) { BiocManager::install('limma', ask = FALSE); if (!requireNamespace('limma')) stop('Package "limma" failed to install') }"
-RUN R -e "if (!requireNamespace('clusterProfiler')) { BiocManager::install('clusterProfiler', ask = FALSE); if (!requireNamespace('clusterProfiler')) stop('Package "clusterProfiler" failed to install') }"
-RUN R -e "if (!requireNamespace('AnnotationDbi')) { BiocManager::install('AnnotationDbi', ask = FALSE); if (!requireNamespace('AnnotationDbi')) stop('Package "AnnotationDbi" failed to install') }"
-RUN R -e "if (!requireNamespace('org.Hs.eg.db')) { BiocManager::install('org.Hs.eg.db', ask = FALSE); if (!requireNamespace('org.Hs.eg.db')) stop('Package "org.Hs.eg.db" failed to install') }"
-RUN R -e "if (!requireNamespace('rawrr')) { BiocManager::install('rawrr', ask = FALSE); if (!requireNamespace('rawrr')) stop('Package "rawrr" failed to install') }"
-RUN R -e "if (!requireNamespace('ComplexHeatmap')) { BiocManager::install('ComplexHeatmap', ask = FALSE); if (!requireNamespace('ComplexHeatmap')) stop('Package "ComplexHeatmap" failed to install') }"
-RUN R -e "if (!requireNamespace('MSstats')) { BiocManager::install('MSstats', ask = FALSE); if (!requireNamespace('MSstats')) stop('Package "MSstats" failed to install') }"
-RUN R -e "if (!requireNamespace('MSstatsTMT')) { BiocManager::install('MSstatsTMT', ask = FALSE); if (!requireNamespace('MSstatsTMT')) stop('Package "MSstatsTMT" failed to install') }"
+RUN mkdir -p /home/jupyter/.jupyter /app/notebooks && \
+    echo "c.ServerApp.root_dir = '/app/notebooks'" >> /home/jupyter/.jupyter/jupyter_server_config.py && \
+    echo "c.IdentityProvider.token = ''" >> /home/jupyter/.jupyter/jupyter_server_config.py && \
+    chown -R jupyter:jupyter /home/jupyter /app/notebooks
 
-RUN R -e "tools::R_user_dir('rawrr', which = 'cache')"
-RUN R -e "rawrr::installRawFileReaderDLLs()"
-RUN R -e "rawrr::installRawrrExe()"
+COPY --chown=jupyter:jupyter jupyter-r/entrypoint.sh /home/jupyter/entrypoint.sh
+RUN chmod +x /home/jupyter/entrypoint.sh
 
-# Expose the Jupyter Notebook port
+USER jupyter
+WORKDIR /home/jupyter
+
 EXPOSE 8888
 
-# Create JupyterLab configuration directory
-RUN mkdir -p /etc/jupyter
-
-# Add JupyterLab configuration to save notebooks in /app/notebooks
-RUN echo "c.ServerApp.root_dir = '/app/notebooks'" >> /etc/jupyter/jupyter_server_config.py
-
-# Add JupyterLab configuration to remove token
-#
-# Caution: This is a security hazard.
-# Remove these lines if you're running the container remotely!
-RUN echo "c.ServerApp.token = ''" >> /etc/jupyter/jupyter_server_config.py && \
-    echo "c.ServerApp.password = ''" >> /etc/jupyter/jupyter_server_config.py
-
-# Command to run Jupyter Notebook
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+ENTRYPOINT ["bash", "/home/jupyter/entrypoint.sh"]

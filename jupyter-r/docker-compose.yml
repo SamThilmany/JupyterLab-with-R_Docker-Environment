@@ -1,13 +1,22 @@
 services:
   jupyter:
+    platform: linux/amd64
     build:
       context: ..
       dockerfile: ./jupyter-r/Dockerfile
+    restart: unless-stopped
     ports:
       - "8888:8888"
     volumes:
-      - ../notebooks:/app/notebooks  # Mount a local folder to store notebooks
+      - ../notebooks:/app/notebooks
+      - ./certs:/etc/jupyter/certs:ro
     environment:
-      - TZ=Europe/Berlin  # Set the container timezone
+      - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sfk https://localhost:8888/api || curl -sf http://localhost:8888/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     image: jupyter_r
     container_name: jupyter_r
