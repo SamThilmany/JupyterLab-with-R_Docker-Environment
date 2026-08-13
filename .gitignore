@@ -1,2 +1,3 @@
 notebooks/*
+!notebooks/.gitkeep
 jupyter-r/certs/

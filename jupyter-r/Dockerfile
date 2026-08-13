@@ -4,11 +4,14 @@ FROM bioconductor/bioconductor_docker:3.21-r-4.5.2@sha256:359702d482e70e343d2a43
 
 # System packages. apt-get upgrade is omitted to keep system library versions
 # fixed to those in the base image, which matters for numerical reproducibility.
+
 RUN apt-get update --fix-missing && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
-        curl && \
+        curl \
+        fonts-sil-charis && \
     update-ca-certificates && \
+    fc-cache -f && \
     apt-get clean && \
     apt-get autoremove -y && \
     apt-get autoclean -y && \

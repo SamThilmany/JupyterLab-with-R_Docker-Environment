@@ -17,7 +17,7 @@ pkgs_cran <- c(
   "repr", "IRdisplay", "IRkernel", "languageserver", "devtools", "tidyverse",
   "showtext", "ggplot2", "ggfortify", "ggforce", "ggtext", "ggrepel", "GGally",
   "ggVennDiagram", "eulerr", "patchwork", "cowplot", "metR", "scales",
-  "doParallel", "combinat", "s2", "RColorBrewer"
+  "doParallel", "combinat", "s2", "RColorBrewer", "msigdbr"
 )
 
 to_install_cran <- pkgs_cran[!pkgs_cran %in% rownames(installed.packages())]
@@ -26,7 +26,7 @@ if (length(to_install_cran) > 0)
 
 # Bioconductor
 pkgs_bioc <- c(
-  "fgsea", "biomaRt", "enrichplot", "DOSE", "limma",
+  "fgsea", "biomaRt", "enrichplot", "DOSE", "HDO.db", "limma",
   "clusterProfiler", "AnnotationDbi", "org.Hs.eg.db",
   "rawrr", "ComplexHeatmap", "circlize", "MSstats", "MSstatsTMT"
 )
