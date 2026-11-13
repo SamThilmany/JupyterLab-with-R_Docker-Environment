@@ -46,16 +46,24 @@ RUN bash /tmp/install_packages.sh
 RUN R -e "IRkernel::installspec(user = FALSE)"
 
 # Download the rawrr dotnet assembly and verify it was installed successfully.
+# Skipped on non-x86_64: the assembly is x64-only (see note at the top of this
+# file), so it has no arm64 build to fetch. The rawrr R package still installs
+# normally; notebooks that only hit their cached .rds results never call into
+# the assembly at runtime, so an arm64 image is fine for those.
 RUN mkdir -p /opt/R-cache && \
-    Rscript -e " \
-    rawrr::installRawrrExe(); \
-    cache_dir <- tools::R_user_dir('rawrr', 'cache'); \
-    asm <- list.files(file.path(cache_dir, 'rawrrassembly'), \
-                      recursive = TRUE, full.names = TRUE); \
-    if (length(asm) == 0) \
-      stop('rawrr assembly not installed. Check network access to fgcz-ms.uzh.ch.'); \
-    message('rawrr OK: ', paste(asm, collapse = ', ')) \
-    " && \
+    if [ "$(uname -m)" = "x86_64" ]; then \
+      Rscript -e " \
+      rawrr::installRawrrExe(); \
+      cache_dir <- tools::R_user_dir('rawrr', 'cache'); \
+      asm <- list.files(file.path(cache_dir, 'rawrrassembly'), \
+                        recursive = TRUE, full.names = TRUE); \
+      if (length(asm) == 0) \
+        stop('rawrr assembly not installed. Check network access to fgcz-ms.uzh.ch.'); \
+      message('rawrr OK: ', paste(asm, collapse = ', ')) \
+      "; \
+    else \
+      echo "Skipping rawrr assembly install on $(uname -m) (x64-only; relies on cached .rds results instead)"; \
+    fi && \
     chmod -R 755 /opt/R-cache
 
 RUN useradd -m -u 1001 -s /bin/bash jupyter

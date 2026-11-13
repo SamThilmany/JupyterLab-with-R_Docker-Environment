@@ -20,3 +20,29 @@ services:
       start_period: 30s
     image: jupyter_r
     container_name: jupyter_r
+
+  # Native arm64 build for Apple Silicon, to sidestep the Rosetta hang.
+  # rawrr's dotnet assembly is skipped (x64-only, see Dockerfile) -- fine for
+  # notebooks that only need their already-cached .rds results. For anything
+  # that needs a fresh rawrr read against a new raw file, use `jupyter` above.
+  jupyter-arm64:
+    platform: linux/arm64
+    build:
+      context: ..
+      dockerfile: ./jupyter-r/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8889:8888"
+    volumes:
+      - ../notebooks:/app/notebooks
+      - ./certs:/etc/jupyter/certs:ro
+    environment:
+      - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sfk https://localhost:8888/api || curl -sf http://localhost:8888/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    image: jupyter_r_arm64
+    container_name: jupyter_r_arm64
