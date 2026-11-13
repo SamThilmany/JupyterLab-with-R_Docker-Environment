@@ -16,7 +16,8 @@ RUN apt-get update --fix-missing && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        fonts-sil-charis && \
+        fonts-sil-charis \
+        fonts-urw-base35 && \
     update-ca-certificates && \
     fc-cache -f && \
     apt-get clean && \
