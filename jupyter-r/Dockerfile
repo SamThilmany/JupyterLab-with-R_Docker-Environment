@@ -28,7 +28,7 @@ RUN apt-get update --fix-missing && \
 
 # Set the Bioconductor mirror. CRAN and download settings are already
 # configured in the base image to use RSPM binary packages; do not override them.
-RUN printf '\noptions(BioC_mirror = "http://bioconductor.statistik.tu-dortmund.de/")\n' \
+RUN printf '\noptions(BioC_mirror = "https://bioconductor.org/")\n' \
     >> /usr/local/lib/R/etc/Rprofile.site
 
 # rawrr stores its dotnet assembly in the R user cache. Using a fixed path
