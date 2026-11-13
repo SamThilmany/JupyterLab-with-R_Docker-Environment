@@ -2,6 +2,13 @@
 # On Apple Silicon, Docker Desktop runs this via Rosetta 2.
 FROM bioconductor/bioconductor_docker:3.21-r-4.5.2@sha256:359702d482e70e343d2a436731b7c6deffd1ec184a1f1700de5d64b0c97cacba
 
+# Some pinned packages (e.g. RcppArmadillo via MSstats) declare CXX_STD = CXX11
+# in their own Makevars, but their bundled headers already use C++14-only
+# syntax (e.g. deduced `auto` return types) -- fine on amd64's default flags,
+# but breaks when a from-source build is actually triggered. Remap what
+# "CXX11" compiles as so those builds succeed without patching every package.
+RUN printf 'CXX11STD = -std=gnu++14\n' >> /usr/local/lib/R/etc/Makevars.site
+
 # System packages. apt-get upgrade is omitted to keep system library versions
 # fixed to those in the base image, which matters for numerical reproducibility.
 
