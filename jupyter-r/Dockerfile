@@ -17,7 +17,8 @@ RUN apt-get update --fix-missing && \
         ca-certificates \
         curl \
         fonts-sil-charis \
-        fonts-urw-base35 && \
+        fonts-urw-base35 \
+        fonts-texgyre && \
     update-ca-certificates && \
     fc-cache -f && \
     apt-get clean && \
